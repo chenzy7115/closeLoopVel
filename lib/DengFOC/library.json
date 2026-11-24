@@ -1,0 +1,13 @@
+{
+  "name": "DengFOC",
+  "version": "0.2.0",
+  "description": "DengFOC V0.2 ESP32 有感 FOC 闭环速度控制库",
+  "keywords": ["FOC", "AS5600", "ESP32", "closed-loop"],
+  "authors": [
+    {
+      "name": "DengFOC"
+    }
+  ],
+  "frameworks": "arduino",
+  "platforms": "espressif32"
+}
