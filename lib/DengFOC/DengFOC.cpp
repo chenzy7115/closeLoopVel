@@ -17,6 +17,11 @@
 
 // 限幅宏：把 amt 钳位到 [low, high] 区间内（用于电压/占空比保护）
 #define _constrain(amt,low,high) ((amt)<(low)?(low):((amt)>(high)?(high):(amt)))
+
+// 调试打印开关：0=关闭（默认）。
+// 初始化/校准信息属于非数字的文本帧，会混入 VOFA+ 的 FireWater 数据流导致波形出错，
+// 因此默认关闭；不用上位机、只看串口日志时可改为 1 打开。
+#define DFOC_DEBUG_SERIAL 0
 float voltage_power_supply;              //!< 母线电压 V（由 DFOC_Vbus() 设置，各环节的归一化基准）
 float Ualpha,Ubeta=0,Ua=0,Ub=0,Uc=0;     //!< Park/Clarke 变换中间量：αβ 轴电压、三相电压
 #define _3PI_2 4.71238898038f            //!< 3π/2，校准电角度时使用的固定电角度
@@ -180,12 +185,16 @@ void DFOC_Vbus(float power_supply)
   ledcAttachChannel(pwmA, 30000, 8, 0);  //PWM频道0，频率30kHz，精度8位
   ledcAttachChannel(pwmB, 30000, 8, 1);  //PWM频道1，频率30kHz，精度8位
   ledcAttachChannel(pwmC, 30000, 8, 2);  //PWM频道2，频率30kHz，精度8位
-  Serial.println("完成PWM初始化设置");
+#if DFOC_DEBUG_SERIAL
+  Serial.println("完成PWM初始化设置");   // 文本帧：会干扰 VOFA+ 波形，默认不输出
+#endif
 
   //AS5600
   S0_I2C.begin(19,18, 400000UL);   // SDA=GPIO19, SCL=GPIO18, 400kHz（快速模式）
   S0.Sensor_init(&S0_I2C);   //初始化编码器0
-  Serial.println("编码器加载完毕");
+#if DFOC_DEBUG_SERIAL
+  Serial.println("编码器加载完毕");     // 文本帧：会干扰 VOFA+ 波形，默认不输出
+#endif
 
   //PID 加载（用真实母线电压重建限幅，避免上面全局构造时 Vbus=0 导致限幅为 0）
   vel_loop_M0 = PIDController(2, 0, 0, 100000, voltage_power_supply/2);
@@ -219,7 +228,9 @@ void DFOC_alignSensor(int _PP,int _DIR)
   S0.Sensor_update();  //更新角度，方便下面电角度读取
   zero_electric_angle=_electricalAngle();   // 记录该位置对应的电角度作为零点
   setTorque(0, _3PI_2);  //松劲（解除校准）
-  Serial.print("0电角度：");Serial.println(zero_electric_angle);
+#if DFOC_DEBUG_SERIAL
+  Serial.print("0电角度：");Serial.println(zero_electric_angle);   // 文本帧：会干扰 VOFA+ 波形，默认不输出
+#endif
 }
 
 /**
@@ -279,7 +290,8 @@ String serialReceiveUserCommand() {
       {
           // 取换行符前的子串并转数字（兼容 "12.5\n" 这类格式）
           motor_target = command.substring(0,commaPosition).toDouble();            //电机目标速度
-          Serial.println(motor_target);
+          // 注意：这里不能回显 motor_target，否则会把单个数字混进 VOFA+ 的逗号分隔数据帧中，
+          // 导致波形出现错位帧（通道数时多时少）。
       }
       // 重置命令缓冲区，准备接收下一帧
       received_chars = "";

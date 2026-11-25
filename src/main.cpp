@@ -22,11 +22,23 @@ void setup()
 void loop()
 {
   // 设置速度环PID
-  DFOC_M0_SET_VEL_PID(0.005, 0.00, 0, 0);
+  DFOC_M0_SET_VEL_PID(0.005, 0.1, 0, 0);
   // 接收串口目标速度
   serialReceiveUserCommand();
   // 设置速度并执行速度闭环
   DFOC_M0_setVelocity(serial_motor_target());
+
+  // ===== VOFA+ 波形输出（FireWater 协议）=====
+  // 数据格式："ch0,ch1,...,\n"，在 VOFA+ 中选择 "FireWater" 协议、波特率 115200
+  // 通道顺序：0 = 目标速度(rad/s)   1 = 实际速度(rad/s)
+  const unsigned long PRINT_INTERVAL_MS = 20;   // 20ms 一帧 => 50Hz 波形
+  static unsigned long last_print_ms = 0;
+  if (millis() - last_print_ms >= PRINT_INTERVAL_MS)
+  {
+    last_print_ms = millis();
+    // 只能输出纯数字和英文逗号，不要带中文/单位，否则 VOFA+ 会解析失败
+    Serial.printf("%.3f,%.3f\n", serial_motor_target(), DFOC_M0_Velocity());
+  }
 
   // // 下面代码是没有加低通滤波，速度控制，直接使用传感器速度，电机会明显的抖动，还会被外界环境干扰
   // float Sensor_Vel = DFOC_M0_Velocity();
